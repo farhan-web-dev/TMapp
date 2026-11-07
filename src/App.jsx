@@ -1,17 +1,100 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DashboardStats from "./components/DashboardStats.jsx";
 import Header from "./components/Header.jsx";
 import TaskForm from "./components/TaskForm.jsx";
 import TaskList from "./components/TaskList.jsx";
 import { fetchTasks } from "./services/taskService.js";
 
+function LoadingState() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center"
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-600"
+        aria-hidden="true"
+      />
+      <p className="text-sm font-medium text-slate-500">Loading your tasks…</p>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center"
+      role="alert"
+    >
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          className="h-6 w-6"
+        >
+          <path
+            d="M12 8v5m0 3h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <h3 className="text-sm font-semibold text-slate-800">
+        Couldn't load your tasks
+      </h3>
+      <p className="max-w-sm text-sm text-slate-500">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-1 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          className="h-4 w-4"
+        >
+          <path
+            d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Retry
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [status, setStatus] = useState("loading");
+  const [error, setError] = useState(null);
+
+  const loadTasks = useCallback(async () => {
+    setStatus("loading");
+    setError(null);
+
+    try {
+      const data = await fetchTasks();
+      setTasks(data);
+      setStatus("success");
+    } catch (err) {
+      setError(err?.message || "Something went wrong while loading tasks.");
+      setStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
-    fetchTasks().then(setTasks);
-  }, []);
+    loadTasks();
+  }, [loadTasks]);
 
   function addTask(taskDetails) {
     setTasks((currentTasks) => [
@@ -142,16 +225,26 @@ function App() {
               ))}
             </div>
           </div>
-          <TaskList
-            tasks={visibleTasks}
-            onToggle={toggleTask}
-            onDelete={deleteTask}
-          />
-          {visibleTasks.length > 0 && (
-            <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
-              Showing {visibleTasks.length}{" "}
-              {visibleTasks.length === 1 ? "task" : "tasks"}
-            </div>
+          {status === "loading" && <LoadingState />}
+
+          {status === "error" && (
+            <ErrorState message={error} onRetry={loadTasks} />
+          )}
+
+          {status === "success" && (
+            <>
+              <TaskList
+                tasks={visibleTasks}
+                onToggle={toggleTask}
+                onDelete={deleteTask}
+              />
+              {visibleTasks.length > 0 && (
+                <div className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
+                  Showing {visibleTasks.length}{" "}
+                  {visibleTasks.length === 1 ? "task" : "tasks"}
+                </div>
+              )}
+            </>
           )}
         </section>
         <footer className="mt-8 text-center text-xs text-slate-400">
